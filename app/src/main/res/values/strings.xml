@@ -1,0 +1,3 @@
+<resources>
+    <string name="accessibility_description">仅在微信前台手动确认后点击当前页面一个“谢谢”按钮；不自动翻页或批量点击。</string>
+</resources>
