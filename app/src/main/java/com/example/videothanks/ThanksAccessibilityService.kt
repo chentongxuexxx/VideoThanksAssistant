@@ -8,6 +8,7 @@ import android.view.Gravity
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -33,14 +34,20 @@ class ThanksAccessibilityService : AccessibilityService() {
     override fun onInterrupt() { enabled = false; if (::status.isInitialized) status.text = "已暂停" }
 
     private fun isWechatForeground(): Boolean {
-        val root = rootInActiveWindow ?: return false
+        val root = wechatRoot() ?: return false
         return root.packageName?.toString() == wechat
+    }
+
+    private fun wechatRoot(): AccessibilityNodeInfo? {
+        val active = rootInActiveWindow
+        if (active?.packageName?.toString() == wechat) return active
+        return windows.firstOrNull { it.type == AccessibilityWindowInfo.TYPE_APPLICATION && it.root?.packageName?.toString() == wechat }?.root
     }
 
     private fun findThanks(root: AccessibilityNodeInfo): List<AccessibilityNodeInfo> {
         val matches = mutableListOf<AccessibilityNodeInfo>()
         fun visit(node: AccessibilityNodeInfo) {
-            if (node.isVisibleToUser && (node.text?.toString()?.trim() == "谢谢" || node.contentDescription?.toString()?.trim() == "谢谢")) {
+            if (node.isVisibleToUser && (node.text?.toString()?.trim()?.contains("谢谢") == true || node.contentDescription?.toString()?.trim()?.contains("谢谢") == true)) {
                 matches.add(node)
             }
             for (i in 0 until node.childCount) node.getChild(i)?.let(::visit)
@@ -61,8 +68,8 @@ class ThanksAccessibilityService : AccessibilityService() {
     private fun scan() {
         if (!enabled) { status.text = "已暂停"; return }
         if (!isWechatForeground()) { status.text = "请先打开微信关注通知页"; return }
-        val nodes = rootInActiveWindow?.let(::findThanks).orEmpty()
-        status.text = "发现 ${nodes.size} 个‘谢谢’，请核对页面"
+        val nodes = wechatRoot()?.let(::findThanks).orEmpty()
+        status.text = if (nodes.isEmpty()) "未识别‘谢谢’：微信可能未提供无障碍文字节点" else "发现 ${nodes.size} 个含‘谢谢’的节点，请核对页面"
     }
 
     private fun confirmOne() {
